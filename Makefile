@@ -1,5 +1,5 @@
 
 
 all:
-	go build -o example teknic/cmd/example
+	go build -o example github.com/thirdmartini/go-teknic/cmd/example
 

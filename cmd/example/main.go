@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"sync"
-	"teknic"
 	"time"
+
+	teknic "github.com/thirdmartini/go-teknic"
 )
 
 func main() {
