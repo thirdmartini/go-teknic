@@ -17,22 +17,39 @@ typedef struct MoveOptions {
     double AccLimit;
     double VelLimit;
     double TrqLimit;
+    int JrkLimit;
 }MoveOptions_t;
 
-void motorMove(Motor_t m, int32_t units, bool absolute, MoveOptions_t opts);
+typedef struct MotorInfo {
+    // TODO
+}MotorInfo_t;
+
+typedef struct {
+    uint64_t Code;
+    char *Msg;
+}Error;
+
+
+Error* motorMove(Motor_t m, int32_t units, bool absolute, MoveOptions_t opts);
 bool motorMoveIsDone(Motor_t m);
-void motorHalt(Motor_t m);
-void motorClear(Motor_t m);
-void motorDisable(Motor_t m);
-void motorEnable(Motor_t m);
+Error* motorMoveCancel(Motor_t m);
+Error* motorHalt(Motor_t m);
+Error* motorClear(Motor_t m);
+Error* motorDisable(Motor_t m);
+Error* motorEnable(Motor_t m);
 bool motorReady(Motor_t m);
 double motorPosition(Motor_t m);
 
 
-typedef struct MotorInfo {
 
-}MotorInfo_t;
+// Error handling
+/*
+int motorLastErrorCode(Motor_t m);
+const char * motorLastErrorMsg(Motor_t m);
+void motorClearLastError(Motor_t m);
+*/
 
+void motorFreeError(Error *error);
 
 
 #ifdef __cplusplus

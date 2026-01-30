@@ -12,52 +12,103 @@ using namespace sFnd;
 #define NUM_MOVES               5
 #define TIME_TILL_TIMEOUT       10000   //The timeout used for homing(ms)
 
+// makeError converts an exception into a struct that can be returned as an error type
+Error* makeError(mnErr& err) {
+    Error *error = (Error *) malloc(sizeof(Error));
+    // TODO: panic on malloc failure
+
+    error->Code = err.ErrorCode;
+    error->Msg = strdup(err.ErrorMsg);
+    return error;
+}
+
 class Motor {
 public:
     INode *node;
 
     Motor(INode *node) {
         this->node = node;
+
+        printf("              type: %d\n", node->Info.NodeType());
+        printf("            userID: %s\n", node->Info.UserID.Value());
+        printf("        FW version: %s\n", node->Info.FirmwareVersion.Value());
+        printf("          Serial #: %d\n", node->Info.SerialNumber.Value());
+        printf("             Model: %s\n", node->Info.Model.Value());
+        printf("TRQ: %d\n", this->node->Limits.TrqGlobal.Value());
+        printf("Tracking: %u\n", this->node->Limits.PosnTrackingLimit.Value());
     }
 
-/*
-    MotorInfo_t Info() {
+    Error* Move(int32_t units, bool absolute, MoveOptions_t opts) {
+        try {
+            this->node->Motion.MoveWentDone();                // Clear the rising edge Move done register
+            this->node->AccUnit(INode::RPM_PER_SEC);          // Set the units for Acceleration to RPM/SEC
+            this->node->VelUnit(INode::RPM);                  // Set the units for Velocity to RPM
+            this->node->TrqUnit(INode::PCT_MAX);
 
-    }*/
+            this->node->Motion.AccLimit = opts.AccLimit;      // Set Acceleration Limit (RPM/Sec)
+            this->node->Motion.VelLimit = opts.VelLimit;      // Set Velocity Limit (RPM)
+            this->node->Motion.JrkLimit = 3;                  // Jerk Limit
+            this->node->Motion.DwellMs = 0;                   // Dewll
+            this->node->Limits.TrqGlobal = opts.TrqLimit;     // Torque Limit
 
+            this->node->Motion.MovePosnStart(units, absolute);
+       } catch(mnErr& theErr) {
+            /// printf("Caught error: addr=%d, err=0x%08x\nmsg=%s\n", theErr.TheAddr, theErr.ErrorCode, theErr.ErrorMsg);
+            //this->lastErrorCode = theErr.ErrorCode;
+            //this->lastErrorMsg = theErr.ErrorMsg;
+            return makeError(theErr);
+       }
 
+      return NULL;
+    }
 
-    void Move(int32_t units, bool absolute, MoveOptions_t opts) {
-        //printf("Moving: %d %b\n", units, absolute);
-        this->node->Motion.MoveWentDone();                                          //Clear the rising edge Move done register
-        this->node->AccUnit(INode::RPM_PER_SEC);                            //Set the units for Acceleration to RPM/SEC
-        this->node->VelUnit(INode::RPM);                                            //Set the units for Velocity to RPM
-        this->node->TrqUnit(INode::PCT_MAX);
-
-        this->node->Motion.AccLimit = opts.AccLimit;                   //Set Acceleration Limit (RPM/Sec)
-        this->node->Motion.VelLimit = opts.VelLimit;                          //Set Velocity Limit (RPM)
-        this->node->Limits.TrqGlobal = opts.TrqLimit;
-        this->node->Motion.MovePosnStart(units, absolute);                       //Execute 10000 encoder count move
+    void Dump() {
+        printf("Trq: %f / %f\n", this->node->Motion.TrqMeasured.Value(), this->node->Motion.TrqCommanded.Value() );
+        printf("Pos: %f\n", this->node->Motion.PosnMeasured.Value());
+        printf("Vel: %f\n", this->node->Motion.VelMeasured.Value());
     }
 
     bool MoveIsDone() {
-        return this->node->Motion.MoveIsDone();
+        bool done =  this->node->Motion.MoveIsDone();
+        return done;
     }
 
-    void MoveStop(nodeStopCodes how) {
-        this->node->Motion.NodeStop(how);
+    Error* MoveStop(nodeStopCodes how) {
+        try {
+            this->node->Motion.NodeStop(how);
+        } catch(mnErr& theErr) {
+            return makeError(theErr);
+        }
+        return NULL;
     }
 
-    void Clear() {
-        this->node->Motion.NodeStopClear();
+    Error* Clear() {
+        try {
+            this->node->Motion.NodeStopClear();
+        } catch(mnErr& theErr) {
+            return makeError(theErr);
+        }
+        return NULL;
     }
 
-    void Disable() {
-        this->node->EnableReq(false);
+    Error* Disable() {
+        try {
+            this->node->EnableReq(false);
+        } catch(mnErr& theErr) {
+            return makeError(theErr);
+        }
+        return NULL;
     }
 
-    void Enable() {
-        this->node->EnableReq(true);
+    Error* Enable() {
+        try {
+            this->node->Status.AlertsClear();                                   //Clear Alerts on node
+            this->node->Motion.NodeStopClear(); //Clear Nodestops on Node
+            this->node->EnableReq(true);
+        } catch(mnErr& theErr) {
+            return makeError(theErr);
+        }
+        return NULL;
     }
 
     bool IsReady() {
@@ -89,6 +140,8 @@ public:
     }
 };
 
+// ---------------------------------------------------------------------------------
+// C++ to C stubs
 Manager_t NewManager() {
     size_t portCount;
     std::vector<std::string> comHubPorts;
@@ -123,14 +176,13 @@ Manager_t NewManager() {
                 theNode.Status.AlertsClear();                                   //Clear Alerts on node
                 theNode.Motion.NodeStopClear(); //Clear Nodestops on Node
                 theNode.EnableReq(true);                                        //Enable node
-                printf("Port: %zi Node: \t%zi enabled\n", i, iNode);
                 m->nodes.push_back( new Motor(&theNode));
             }
         }
         return (Manager_t) m;
 
     } catch(mnErr& theErr) {
-        printf("Port Failed to open, Check to ensure correct Port number and that ClearView is not using the Port\n");
+        //printf("Port Failed to open, Check to ensure correct Port number and that ClearView is not using the Port\n");
         //This statement will print the address of the error, the error code (defined by the mnErr class),
         //as well as the corresponding error message.
         printf("Caught error: addr=%d, err=0x%08x\nmsg=%s\n", theErr.TheAddr, theErr.ErrorCode, theErr.ErrorMsg);
@@ -143,9 +195,7 @@ Manager_t NewManager() {
 void mgrClose(Manager_t m) {
     auto mgr = (Manager*) m;
 
-
     try {
-        printf("Disabling nodes, and closing port\n");
         for (auto iter = mgr->nodes.begin() ; iter != mgr->nodes.end(); ++iter ) {
             Motor *motor = *iter;
             motor->node->EnableReq(false);
@@ -163,29 +213,31 @@ Motor_t mgrGetMotor(Manager_t m, unsigned i) {
     return mgr->getMotor(i);
 }
 
-void motorMove(Motor_t m, int32_t units, bool absolute, MoveOptions_t opts) {
-    ((Motor*)m)->Move(units, absolute, opts);
+Error* motorMove(Motor_t m, int32_t units, bool absolute, MoveOptions_t opts) {
+    return ((Motor*)m)->Move(units, absolute, opts);
 }
 
 bool motorMoveIsDone(Motor_t m) {
     return ((Motor*)m)->MoveIsDone();
 }
 
-void motorHalt(Motor_t m) {
+Error* motorMoveCancel(Motor_t m) {
+    return ((Motor*)m)->MoveStop(STOP_TYPE_RAMP_AT_DECEL);
+}
+
+Error* motorHalt(Motor_t m) {
     return ((Motor*)m)->MoveStop(STOP_TYPE_ABRUPT);
 }
 
-// Clears any stop conditions
-void motorClear(Motor_t m) {
+Error* motorClear(Motor_t m) {
     return ((Motor*)m)->Clear();
 }
 
-
-void motorEnable(Motor_t m) {
+Error* motorEnable(Motor_t m) {
     return ((Motor*)m)->Enable();
 }
 
-void motorDisable(Motor_t m) {
+Error* motorDisable(Motor_t m) {
     return ((Motor*)m)->Disable();
 }
 
@@ -197,3 +249,10 @@ double motorPosition(Motor_t m) {
     return ((Motor*)m)->Position();
 }
 
+// motorFreeError must be called to release any error returned by motor api
+void motorFreeError(Error *error) {
+    if( error != NULL ) {
+        free(error->Msg);
+        free(error);
+    }
+}
