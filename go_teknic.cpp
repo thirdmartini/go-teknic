@@ -132,6 +132,10 @@ public:
         this->sys = NULL;
     }
 
+    unsigned getMotorCount() {
+        return (unsigned) this->nodes.size();
+    }
+
     Motor_t getMotor(unsigned i) {
         if ( i < this->nodes.size() ) {
             return (Motor_t) this->nodes[i];
@@ -206,6 +210,11 @@ void mgrClose(Manager_t m) {
     mgr->sys->PortsClose();
 
     delete mgr;
+}
+
+unsigned mgrGetMotorCount(Manager_t m) {
+    auto mgr = (Manager*) m;
+    return mgr->getMotorCount();
 }
 
 Motor_t mgrGetMotor(Manager_t m, unsigned i) {

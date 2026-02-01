@@ -13,10 +13,16 @@ import (
 */
 import "C"
 
+// Manager represents the tecnic  motor manager
 type Manager struct {
 	mgr C.Manager_t
 }
 
+func (m *Manager) MotorCount() uint {
+	return uint(C.mgrGetMotorCount(m.mgr))
+}
+
+// Motor returns the motor by order
 func (m *Manager) Motor(i uint) (*Motor, error) {
 	motor := C.mgrGetMotor(m.mgr, C.uint(i))
 	if motor == nil {
@@ -26,12 +32,14 @@ func (m *Manager) Motor(i uint) (*Motor, error) {
 	return NewMotor(motor), nil
 }
 
+// Close the motor controller, this will disabble all attached motors
 func (m *Manager) Close() error {
 	C.mgrClose(m.mgr)
 	m.mgr = nil
 	return nil
 }
 
+// NewManager returns an instance of the motor controller manager
 func NewManager() (*Manager, error) {
 	m := Manager{}
 

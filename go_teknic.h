@@ -11,6 +11,7 @@ typedef void * Manager_t;
 
 Manager_t NewManager();
 void mgrClose(Manager_t m);
+unsigned mgrGetMotorCount(Manager_t m);
 Motor_t mgrGetMotor(Manager_t m, unsigned motor);
 
 typedef struct MoveOptions {
